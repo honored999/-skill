@@ -1,6 +1,6 @@
 ---
 name: subagent-orchestration
-description: Coordinate scoped Codex workers for implementation, testing, auditing, review, fixes, and integration. Use when choosing between a normal subagent, an automatically created independent Worktree Chat/task, a user-created top-level Codex thread fallback, or a persistent external process; defining scope; monitoring workers; collecting results; handling blockers/failures; or decomposing work.
+description: Coordinate scoped Codex workers for implementation, testing, auditing, review, fixes, and integration. Use when choosing between a normal subagent, an automatically created independent Worktree Chat/task, a user-created top-level Codex thread fallback, or a persistent external process; defining scope; monitoring workers; collecting results; handling blockers/failures; escalating execution mode; reviewing uncommitted work; or decomposing work.
 ---
 
 # Subagent orchestration
@@ -17,6 +17,35 @@ For substantial work, prefer an automatically created independent Codex
 Worktree Chat/task using LunaMax when the platform supports it reliably.
 A user-created top-level Codex conversation is only the fallback when automatic
 independent-task creation or result retrieval is unavailable.
+
+## Authorization inheritance
+
+Once the user has authorized the underlying implementation, review, validation,
+audit, or fixer work, that authorization also covers routine worker creation
+needed to execute the same already-authorized task.
+
+Creating or switching between a normal subagent, independent Worktree Chat/task,
+reviewer, fixer, or validation worker is an execution-mode decision owned by the
+main agent. It is not, by itself, a new user-facing task.
+
+Do not ask the user for separate approval merely to:
+
+- create a normal subagent;
+- create an independent Worktree Chat/task;
+- create an independent reviewer;
+- create a narrowly scoped fixer;
+- create a validation worker;
+- switch execution mode after worker-channel failure.
+
+Ask again only when a genuine decision gate is reached, such as scope expansion,
+a materially different implementation choice, destructive action, credentials or
+permissions, experimental-protocol choice, or a tool/runtime that itself requires
+explicit user confirmation.
+
+If a platform or tool has a higher-priority rule that requires explicit user
+consent before creating a task/chat, state that concrete tool-level restriction
+at the first point where it blocks the required execution mode. Do not first
+spawn repeated equivalent workers and only later introduce the approval gate.
 
 ## Execution-mode selection
 
@@ -40,6 +69,12 @@ Use:
 `delegate -> monitor sparsely -> wait -> collect -> validate`
 
 The time estimate is a heuristic, not a hard limit.
+
+A normal subagent may also be appropriate when the user explicitly requires
+changes to land directly in an existing dirty worktree and an independent
+worktree cannot safely observe or modify those uncommitted changes. This is a
+technical placement constraint, not a general reason to avoid independent
+workers for later review or validation.
 
 ### Automatic independent Worktree Chat/task
 
@@ -97,6 +132,43 @@ Only the main agent may change execution mode.
 Elapsed time alone is not a blocker.
 Context compaction alone is not a blocker.
 
+## Main-agent execution-mode escalation
+
+The main agent must distinguish a slow healthy worker from a failing worker
+channel.
+
+Do not switch modes merely because one healthy worker has been running for a
+while. First collect evidence such as task state, output/progress, returned
+errors, synchronized files, or missing HANDOFF behavior.
+
+However, if the same normal-subagent channel fails to produce usable progress or
+a terminal HANDOFF twice for the same task class, stop spawning equivalent normal
+subagents for that core task.
+
+Typical evidence of a worker-channel failure includes:
+
+- repeated workers remain `RUNNING` without usable progress/status beyond the
+  expected monitoring window;
+- workers ignore status requests and never return a HANDOFF;
+- completion occurs only after forced termination;
+- isolated-worker changes fail to synchronize back reliably;
+- multiple narrowly reduced tasks fail in the same way despite no repository,
+  test, permission, or data blocker.
+
+When this pattern is established, automatically escalate:
+
+`normal subagent -> independent Worktree Chat/task -> documented fallback`
+
+Do not require the user to choose or separately approve this escalation when the
+underlying work was already authorized.
+
+Do not keep reducing and respawning equivalent normal subagents indefinitely.
+Record the infrastructure evidence and change execution mode.
+
+If automatic independent-task creation itself fails repeatedly for
+infrastructure/tool reasons, use the manual top-level-thread fallback or another
+documented supported mode.
+
 ## No recursive independent-worker handoff
 
 An independent Worktree Chat/task is the top-level execution worker for its
@@ -134,6 +206,48 @@ When the main agent creates an independent Worktree Chat/task:
 If creation fails because of a clear parameter/schema mismatch, retry using the
 correct structure. Do not silently downgrade reviewer independence or reuse the
 implementation worker merely because creation failed once.
+
+## Independent review of uncommitted work
+
+An independent reviewer must review the actual intended change set, not merely
+the baseline branch.
+
+A newly created worktree normally cannot see uncommitted or untracked changes
+from another worktree. Therefore, when the review target is dirty or contains
+untracked intended files, the main agent must explicitly make the review target
+visible without mutating the source worktree.
+
+Preferred approaches, in order:
+
+1. use a platform-supported read-only working-tree snapshot/diff handoff;
+2. create a review-only patch/snapshot artifact containing all intended tracked
+   and untracked changes plus the exact baseline commit SHA;
+3. when appropriate and authorized by the task workflow, create a temporary
+   review commit/ref that preserves the exact change set without rewriting user
+   history.
+
+The review brief must identify:
+
+- baseline commit SHA;
+- intended changed/untracked files;
+- snapshot/patch identity or location;
+- whether the reviewer is inspecting a commit, worktree, or patch;
+- any files intentionally excluded from review.
+
+The independent reviewer must remain read-only unless explicitly assigned fixer
+work.
+
+Do not:
+
+- assume another worktree can see dirty changes;
+- silently review only `HEAD` when the intended diff is uncommitted;
+- force-stash, reset, clean, overwrite, or commit unrelated user work;
+- fall back indefinitely to shared normal reviewers merely because the target is
+  uncommitted.
+
+If no supported mechanism can transfer the uncommitted review target safely,
+report that concrete technical blocker. Ask the user only if the remaining
+fallback itself requires user action or explicit tool-level authorization.
 
 ## Automatic independent-worker result collection
 
@@ -179,6 +293,7 @@ Include:
 - repository/worktree path;
 - current branch or exact commit snapshot;
 - current Git state when relevant;
+- review snapshot/patch identity when reviewing uncommitted work;
 - optional shared Deep Work/conversation link;
 - goal;
 - authoritative `AGENTS.md`, specs/plans/source documents;
@@ -224,6 +339,7 @@ HANDOFF
 - reviewer/worker identity and independence, when relevant:
 - branch/worktree or exact snapshot:
 - starting/reviewed commit(s):
+- review snapshot/patch, when relevant:
 - changed files:
 - implemented behavior:
 - important design decisions:
@@ -298,6 +414,10 @@ Do not send instructions such as:
 - `give PASS/BLOCKING now`;
 - `finish with current evidence`.
 
+This rule applies to healthy workers. It does not prohibit the main agent from
+terminating a worker after concrete infrastructure-failure evidence has been
+established under the execution-mode escalation policy.
+
 ## Monitoring cadence
 
 For a healthy normal subagent, prefer sparse monitoring. Roughly 5-10 minute
@@ -311,11 +431,19 @@ repetitive user-facing commentary.
 For automatically created Worktree Chats/tasks, prefer platform task-state and
 result retrieval over conversational polling.
 
+If multiple normal workers have already shown the same non-responsive behavior,
+do not restart the monitoring clock indefinitely for each replacement worker.
+Apply the execution-mode escalation policy.
+
 ## Decision gates
 
 Ask the user only when approval, scope expansion, destructive action,
 experimental protocol, credentials/permissions, materially different choices,
-or manual top-level-thread fallback is genuinely required.
+manual top-level-thread fallback requiring user action, or an explicit
+tool/runtime confirmation requirement is genuinely present.
+
+Do not ask the user merely to approve internal orchestration choices for work
+that is already authorized.
 
 Do not ask the user to perform manual handoff if the platform can create and
 retrieve the independent task automatically.
@@ -333,7 +461,11 @@ code/model defect without evidence.
 
 A blocker must be concrete, such as reproducible test failure, missing required
 input, permission failure, incompatible interface, contradictory validated data,
-unsafe output behavior, or an undefined required protocol decision.
+unsafe output behavior, an undefined required protocol decision, or a verified
+worker/task infrastructure failure that prevents the selected execution mode.
+
+Worker-channel failure is not automatically a repository blocker. When another
+supported execution mode exists, escalate first.
 
 ## Fixer flow
 
