@@ -1,6 +1,6 @@
 ---
 name: subagent-orchestration
-description: Coordinate scoped Codex workers for implementation, testing, auditing, review, fixes, and integration. Use when choosing between a normal subagent, an automatically created independent Worktree Chat/task, a user-created top-level Codex thread fallback, or a persistent external process; defining scope; monitoring workers; collecting results; handling blockers/failures; escalating execution mode; reviewing uncommitted work; or decomposing work.
+description: Coordinate scoped Codex workers for implementation, testing, auditing, review, fixes, validation, and integration. Use when selecting execution mode, defining worker ownership/scope, creating or monitoring independent tasks, collecting HANDOFFs, escalating failed worker channels, reviewing uncommitted work, or coordinating reviewer/fixer flows.
 ---
 
 # Subagent orchestration
@@ -10,333 +10,291 @@ description: Coordinate scoped Codex workers for implementation, testing, auditi
 Use delegated workers to reduce duplicated repository reading, execution risk,
 and main-agent context usage.
 
-Normal subagents use the user's/Codex environment's configured model and
-reasoning defaults.
+The main agent owns planning, execution-mode selection, integration, acceptance,
+Git coordination, and final reporting.
 
-For substantial work, prefer an automatically created independent Codex
-Worktree Chat/task using LunaMax when the platform supports it reliably.
-A user-created top-level Codex conversation is only the fallback when automatic
-independent-task creation or result retrieval is unavailable.
+Normal subagents use the environment's configured model/reasoning defaults.
+For substantial independent work, prefer `LunaMax` unless the user requests
+another profile. Explicitly request it when the platform supports model selection;
+do not assume inheritance.
 
-## Authorization inheritance
+## Authorization and decision gates
 
-Once the user has authorized the underlying implementation, review, validation,
-audit, or fixer work, that authorization also covers routine worker creation
-needed to execute the same already-authorized task.
+Authorization for the underlying implementation/review/validation/audit/fixer
+also covers routine worker creation and execution-mode changes needed for that
+same task.
 
-Creating or switching between a normal subagent, independent Worktree Chat/task,
-reviewer, fixer, or validation worker is an execution-mode decision owned by the
-main agent. It is not, by itself, a new user-facing task.
+Do not ask separately to create a normal subagent, independent task, reviewer,
+validator, fixer, or to escalate after worker-channel failure.
 
-Do not ask the user for separate approval merely to:
+Ask the user only for a genuine decision gate:
 
-- create a normal subagent;
-- create an independent Worktree Chat/task;
-- create an independent reviewer;
-- create a narrowly scoped fixer;
-- create a validation worker;
-- switch execution mode after worker-channel failure.
+- scope expansion;
+- materially different implementation choices;
+- destructive/irreversible action;
+- credentials, permissions, or external access;
+- experimental-protocol choice;
+- explicit tool/runtime confirmation;
+- manual fallback requiring user action.
 
-Ask again only when a genuine decision gate is reached, such as scope expansion,
-a materially different implementation choice, destructive action, credentials or
-permissions, experimental-protocol choice, or a tool/runtime that itself requires
-explicit user confirmation.
+Higher-priority platform/tool confirmation rules always apply.
 
-If a platform or tool has a higher-priority rule that requires explicit user
-consent before creating a task/chat, state that concrete tool-level restriction
-at the first point where it blocks the required execution mode. Do not first
-spawn repeated equivalent workers and only later introduce the approval gate.
+## Execution modes
 
-## Execution-mode selection
+Choose one primary mode per core task:
 
-Choose one mode before execution begins:
+1. **Normal subagent** — localized work, a few related files, focused bugs/tests,
+   small audits/fixers, modest reading, or work that must land directly in a dirty
+   worktree an isolated worker cannot safely observe.
+2. **Independent Worktree Chat/task** — substantial or multi-module work,
+   significant repository/paper/spec reading, repeated TDD/debug cycles, broad
+   correctness review, high context pressure, or work benefiting from isolation.
+3. **Manual top-level-thread fallback** — only when automatic independent-task
+   creation/result retrieval is unavailable or the user explicitly prefers it.
+4. **Persistent external process** — multi-hour training, simulations, long builds,
+   or services.
 
-1. normal subagent;
-2. automatically created independent Worktree Chat/task;
-3. user-created independent top-level Codex thread fallback;
-4. persistent external process for genuinely long execution.
+Do not execute the same core implementation concurrently in multiple modes.
+The parent remains responsible for collecting, validating, and accepting delegated
+results.
 
-The main agent owns this decision.
+Direct parent implementation is not a substitute execution mode when a supported
+delegated mode has been selected and is available.
 
-### Normal subagent
+## Planning/TDD skills do not override execution-mode selection
 
-Prefer for localized work, one/few closely related files, focused bugs/tests,
-small audits/fixers, modest repository reading, and work reasonably expected to
-finish in roughly under 10 minutes.
+Planning and workflow skills such as `writing-plans`, `executing-plans`, TDD,
+debugging, or verification define **what** work should happen and in what order.
+They do not decide **who** owns implementation.
 
-Use:
+Resolve execution mode before the first implementation write whenever practical.
+A phrase such as `inline executing-plans` does not authorize the parent to bypass
+the selected worker mode.
 
-`delegate -> monitor sparsely -> wait -> collect -> validate`
+When **normal subagent** is selected:
 
-The time estimate is a heuristic, not a hard limit.
+- the parent may write or update coordination-only artifacts such as the plan,
+  task brief, review notes, or validation checklist;
+- one scoped normal subagent should own the implementation lane;
+- RED test edits and the corresponding GREEN production edits normally belong to
+  that same implementation owner;
+- the parent must not directly edit source/test files in that owned lane while the
+  worker is active;
+- a later read-only reviewer does not retroactively satisfy implementation
+  delegation.
 
-A normal subagent may also be appropriate when the user explicitly requires
-changes to land directly in an existing dirty worktree and an independent
-worktree cannot safely observe or modify those uncommitted changes. This is a
-technical placement constraint, not a general reason to avoid independent
-workers for later review or validation.
+When **independent Worktree Chat/task** is selected, the existing independent-task
+rule still applies: the parent must not continue the same implementation.
 
-### Automatic independent Worktree Chat/task
+If the selected worker interface is unavailable or repeatedly fails, follow the
+worker-channel escalation policy instead of silently absorbing implementation
+into the parent. Parent-side direct implementation is only a documented last
+fallback when supported delegation paths are unavailable and the task can still
+be completed safely.
 
-Prefer when work is substantial, multi-module, requires significant
-repository/paper/spec reading, multiple TDD/debug cycles, a broad/deep Level 3
-audit, likely 10-15 minutes or more, likely tens of minutes, or likely context
-compaction.
+If the parent already made implementation edits before detecting an orchestration
+mismatch, do **not** spawn another worker merely to rewrite or duplicate the same
+diff for procedural purity. Freeze further overlapping parent edits, inspect the
+current ownership/state, delegate only genuinely remaining non-overlapping work
+when useful, and continue review/validation. Record the orchestration deviation
+in the final report.
 
-When supported, the main agent should create this task itself and use LunaMax
-unless the user requests another model.
+### Normal subagent rules
 
-When this mode is selected:
+Typical lifecycle:
 
-- do not also launch a normal subagent for the same core task;
-- do not continue the same implementation concurrently in the parent;
-- use an isolated worktree when appropriate;
-- do not reuse an implementation worker as an independent reviewer;
-- preserve task/thread/worktree identifiers returned by the platform;
-- the parent remains responsible for eventually collecting and validating the
-  final result.
+`delegate -> monitor sparsely -> collect -> inspect -> validate`
 
-### Manual top-level thread fallback
+A normal subagent must complete, return `BLOCKED`, or return `FAILED`. It must not
+switch itself into another top-level execution mode. Elapsed time or context
+compaction alone is not a blocker.
 
-Use only when automatic Worktree Chat creation is unavailable, repeatedly fails
-for infrastructure/tool reasons, the final result cannot be retrieved, or the
-user explicitly prefers manual mode.
+For a localized TDD task, prefer one normal subagent to carry the complete
+`RED -> minimal GREEN -> focused validation` implementation loop within its
+declared write scope. The parent owns acceptance and broader validation, not the
+same source/test edits.
 
-Generate a self-contained task brief and ask the user to run it in a new
-top-level Codex conversation using LunaMax by default.
+### Independent task rules
 
-The user then returns the final `HANDOFF`.
+When supported:
 
-### Persistent external process
+- explicitly request the preferred independent-worker profile;
+- request an isolated worktree when appropriate;
+- record returned task/thread/worktree identifiers;
+- verify returned model/profile metadata when available;
+- record when model selection cannot be set or verified;
+- do not also run a normal subagent for the same core task;
+- do not continue the same implementation in the parent;
+- do not reuse the implementation worker as its independent reviewer.
 
-For multi-hour training, simulations, long builds, or services, use a persistent
-OS process when appropriate. Record PID/process identity, logs, run identity,
-configuration, and output location.
+### Persistent-process rules
 
-## No mid-task execution-mode switching by normal subagents
+Record PID/process identity, logs, run/configuration identity, and output location
+when relevant. A worker remaining `RUNNING` does not guarantee the underlying OS
+process is persistent.
 
-A normal subagent must not switch itself into independent-task mode.
+## Work ownership and scope
 
-Once launched, it should either:
+Each writable component or implementation lane has exactly one active
+implementation owner. Planning ownership is separate from implementation
+ownership: the parent may own the plan while a worker owns the implementation.
 
-- complete the assigned task;
-- return `BLOCKED` with concrete evidence;
-- return `FAILED` with concrete evidence.
+Do not assign overlapping implementation responsibility to multiple workers even
+when their nominal file lists differ. Parallel workers are appropriate only when
+write scopes and interface responsibilities are independent.
 
-It must not stop merely because the task is taking longer, ask the user to open
-another top-level thread, move itself to LunaMax, create another independent
-Worktree Chat for the core task, or abandon work because of context compaction.
+Reviewers/validators remain read-only unless explicitly reassigned as fixers.
+Never allow two workers to modify the same file concurrently.
 
-Only the main agent may change execution mode.
+Every writable worker assignment must define:
 
-Elapsed time alone is not a blocker.
-Context compaction alone is not a blocker.
+1. readable files/directories;
+2. exact writable files/directories;
+3. forbidden files/directories;
+4. expected deliverable;
+5. acceptance criteria.
 
-## Main-agent execution-mode escalation
+Workers must not expand their own scope. Do not split a small change across
+multiple implementers merely for structure.
 
-The main agent must distinguish a slow healthy worker from a failing worker
-channel.
+## Independent-task lifecycle
 
-Do not switch modes merely because one healthy worker has been running for a
-while. First collect evidence such as task state, output/progress, returned
-errors, synchronized files, or missing HANDOFF behavior.
+When creating an independent task:
 
-However, if the same normal-subagent channel fails to produce usable progress or
-a terminal HANDOFF twice for the same task class, stop spawning equivalent normal
-subagents for that core task.
-
-Typical evidence of a worker-channel failure includes:
-
-- repeated workers remain `RUNNING` without usable progress/status beyond the
-  expected monitoring window;
-- workers ignore status requests and never return a HANDOFF;
-- completion occurs only after forced termination;
-- isolated-worker changes fail to synchronize back reliably;
-- multiple narrowly reduced tasks fail in the same way despite no repository,
-  test, permission, or data blocker.
-
-When this pattern is established, automatically escalate:
-
-`normal subagent -> independent Worktree Chat/task -> documented fallback`
-
-Do not require the user to choose or separately approve this escalation when the
-underlying work was already authorized.
-
-Do not keep reducing and respawning equivalent normal subagents indefinitely.
-Record the infrastructure evidence and change execution mode.
-
-If automatic independent-task creation itself fails repeatedly for
-infrastructure/tool reasons, use the manual top-level-thread fallback or another
-documented supported mode.
-
-## No recursive independent-worker handoff
-
-An independent Worktree Chat/task is the top-level execution worker for its
-assigned core task.
-
-It must not hand the core task off again to another independent Worktree Chat or
-another top-level conversation.
-
-It may use a small number of short, narrowly scoped normal subagents for:
-
-- focused read-only investigation;
-- targeted tests;
-- narrowly scoped review;
-- small fixer work.
-
-Those normal subagents must not create nested workers for the same core task.
-
-If the independent worker cannot complete the task within scope, return
-`BLOCKED` with concrete evidence.
-
-## Automatic independent-task creation
-
-When the main agent creates an independent Worktree Chat/task:
-
-1. define task and acceptance criteria;
-2. create it with the intended model/reasoning profile;
+1. define goal and acceptance criteria;
+2. select the preferred profile unless overridden;
 3. request an isolated worktree when appropriate;
-4. record all returned identifiers, including client task ID, formal task ID,
-   thread/chat ID, project ID, and worktree path when available;
-5. do not treat "queued", "setup", or only a client-side ID as proof that a
-   runnable thread exists;
-6. resolve the formal thread/task identifier if setup is asynchronous;
-7. keep the parent repository state unchanged while the worker owns the task.
+4. record available client-task, formal-task, thread/chat, project, and worktree
+   identifiers;
+5. do not treat only `queued`, `setup`, or a client-side ID as proof that a usable
+   worker exists;
+6. resolve the formal task/thread ID when setup is asynchronous;
+7. keep the parent worktree unchanged while the worker owns the task.
 
-If creation fails because of a clear parameter/schema mismatch, retry using the
-correct structure. Do not silently downgrade reviewer independence or reuse the
-implementation worker merely because creation failed once.
-
-## Independent review of uncommitted work
-
-An independent reviewer must review the actual intended change set, not merely
-the baseline branch.
-
-A newly created worktree normally cannot see uncommitted or untracked changes
-from another worktree. Therefore, when the review target is dirty or contains
-untracked intended files, the main agent must explicitly make the review target
-visible without mutating the source worktree.
-
-Preferred approaches, in order:
-
-1. use a platform-supported read-only working-tree snapshot/diff handoff;
-2. create a review-only patch/snapshot artifact containing all intended tracked
-   and untracked changes plus the exact baseline commit SHA;
-3. when appropriate and authorized by the task workflow, create a temporary
-   review commit/ref that preserves the exact change set without rewriting user
-   history.
-
-The review brief must identify:
-
-- baseline commit SHA;
-- intended changed/untracked files;
-- snapshot/patch identity or location;
-- whether the reviewer is inspecting a commit, worktree, or patch;
-- any files intentionally excluded from review.
-
-The independent reviewer must remain read-only unless explicitly assigned fixer
-work.
-
-Do not:
-
-- assume another worktree can see dirty changes;
-- silently review only `HEAD` when the intended diff is uncommitted;
-- force-stash, reset, clean, overwrite, or commit unrelated user work;
-- fall back indefinitely to shared normal reviewers merely because the target is
-  uncommitted.
-
-If no supported mechanism can transfer the uncommitted review target safely,
-report that concrete technical blocker. Ask the user only if the remaining
-fallback itself requires user action or explicit tool-level authorization.
-
-## Automatic independent-worker result collection
-
-When the main agent created the independent task, it remains responsible for
-collecting the result.
+If creation fails because of a clear parameter/schema mismatch, retry with the
+correct structure. Do not weaken reviewer independence merely because creation
+failed once.
 
 Preferred lifecycle:
 
-`create -> record identifiers -> wait/monitor sparsely -> detect terminal state -> open/read worker thread -> collect HANDOFF -> validate -> continue`
+`create -> record IDs -> monitor sparsely -> detect terminal state -> read result -> collect HANDOFF -> validate -> continue`
 
-If the platform supports listing/opening/reading the created task/thread:
+When supported, reopen/read the created task after completion and collect
+`HANDOFF` or `PASS/BLOCKING` automatically. Do not require manual copy/paste when
+reliable retrieval exists, and do not assume completion automatically wakes a
+paused parent.
 
-- preserve its identifier;
-- retrieve the final worker response after completion;
-- read the final `HANDOFF` or `PASS/BLOCKING`;
-- validate it against repository state and required evidence;
-- continue the parent workflow.
+If automatic creation/result retrieval is unavailable, use the manual top-level
+fallback and ask the user to return the final `HANDOFF`.
 
-Do not require manual HANDOFF copy/paste when the main agent can reliably
-retrieve the result itself.
+## Monitoring, escalation, and stale tasks
 
-Do not assume worker completion automatically wakes a paused parent unless that
-behavior has been verified in the current environment.
+Healthy workers should be monitored sparsely. Do not generate repetitive
+user-facing `RUNNING -> RUNNING` updates or force a healthy worker to stop for an
+early summary.
 
-If automatic wake-up does not occur, the saved task/thread ID should be used to
-open/read the completed worker when the parent is resumed.
+Before replacing a worker/reviewer, reopen/re-list existing task/thread IDs for
+the same core task and consume any valid terminal result already produced.
+Do not create replacements merely because setup metadata is stale.
 
-If the platform cannot reliably retrieve the final result, explicitly fall back
-to:
+Worker-channel failure evidence may include:
 
-`Please paste the worker's final HANDOFF back into this conversation.`
+- repeated absence of usable progress or HANDOFF;
+- ignored status requests;
+- usable completion only after forced termination;
+- isolated changes failing to synchronize reliably;
+- repeated narrowed workers failing without a repository/test/data blocker.
 
-Manual handoff is a fallback, not the preferred path when automatic retrieval is
-available.
+Normally, after two evidenced failures of the same normal-subagent channel for
+the same task class, stop respawning equivalents and escalate:
 
-## Independent-worker task brief
+`normal subagent -> independent Worktree Chat/task -> documented fallback`
 
-Whether created automatically or manually, the task brief must be self-contained
-but compact.
+The count is a heuristic, not an absolute rule. Escalate earlier/later when the
+evidence justifies it.
 
-Include:
+Worker-channel failure is not automatically a repository blocker; use another
+supported mode first when possible.
+
+If an older/duplicate task later produces a valid result, consume the useful
+result and avoid duplicate work. Cancel/close obsolete tasks when safely
+supported. Never allow stale workers to continue modifying a scope after
+ownership has moved elsewhere.
+
+## No recursive independent-worker handoff
+
+An independent Worktree Chat/task is the top-level execution worker for its core
+task and must not hand that core task to another independent task/thread.
+
+It may use a small number of narrowly scoped normal subagents for focused
+read-only investigation, targeted tests, narrow review, or small fixer work.
+Those subagents must not recursively create workers for the same core task.
+
+If the independent worker cannot complete within scope, return `BLOCKED` with
+concrete evidence.
+
+## Independent review of uncommitted work
+
+An independent reviewer must inspect the actual intended change set, not merely
+the baseline branch.
+
+Because a new worktree normally cannot see another worktree's dirty/untracked
+changes, expose the intended review target without mutating the source worktree.
+Preferred approaches:
+
+1. platform-supported read-only working-tree snapshot/diff;
+2. review-only patch/snapshot containing intended tracked/untracked changes plus
+   the exact baseline commit;
+3. when appropriate and authorized, a temporary review commit/ref preserving the
+   exact intended change set without rewriting unrelated history.
+
+The review brief must identify baseline commit, intended changed/untracked files,
+snapshot/patch/commit identity, what the reviewer is actually inspecting, and
+intentionally excluded files.
+
+The reviewer remains read-only unless reassigned as a fixer. Do not stash, reset,
+clean, overwrite, or silently commit unrelated user work to make review easier.
+If no supported mechanism can expose the real change set safely, report the
+concrete technical blocker.
+
+## Worker task brief
+
+Keep independent-worker briefs self-contained but compact. Include, when relevant:
 
 - repository/worktree path;
-- current branch or exact commit snapshot;
-- current Git state when relevant;
-- review snapshot/patch identity when reviewing uncommitted work;
-- optional shared Deep Work/conversation link;
-- goal;
-- authoritative `AGENTS.md`, specs/plans/source documents;
-- relevant existing implementation state;
-- exact read scope;
-- exact write scope;
-- forbidden scope;
+- current branch/commit and Git state;
+- goal and relevant existing implementation state;
+- authoritative `AGENTS.md`, specs, plans, or source documents;
+- exact read/write/forbidden scope;
 - important invariants;
-- acceptance criteria;
-- required validation;
+- acceptance criteria and required validation;
+- review snapshot/patch identity for uncommitted review;
 - Git/commit instructions;
-- required final `HANDOFF` format.
+- required HANDOFF format.
 
-Do not paste the entire parent conversation history.
-Do not make the worker rediscover already-decided architecture unnecessarily.
-Do not reset, stash, clean, overwrite, amend, or rewrite unrelated user work
-unless authorized.
+Do not paste the full parent conversation or make workers rediscover already
+settled architecture unnecessarily.
 
-## Shared context link
-
-A shared conversation/Deep Work link is optional background only.
-
-Current authoritative sources are:
+Authoritative context priority:
 
 1. current task brief;
 2. current repository/worktree or exact snapshot;
 3. applicable `AGENTS.md` and project-local instructions;
-4. authoritative task spec/design document.
+4. authoritative task specification/design/source documents.
 
-If shared context conflicts with current authoritative sources, follow the
-current sources and report the discrepancy.
+Shared conversation links are optional background only. If they conflict with
+current authoritative sources, follow the current sources and report the
+discrepancy.
 
-The task must remain executable if the link is unavailable.
+## HANDOFF
 
-## Independent worker HANDOFF
-
-Before finishing, return:
+Independent workers should return:
 
 ```text
 HANDOFF
 
 - status: COMPLETED / BLOCKED / FAILED
-- reviewer/worker identity and independence, when relevant:
+- worker/reviewer identity and independence, when relevant:
 - branch/worktree or exact snapshot:
 - starting/reviewed commit(s):
 - review snapshot/patch, when relevant:
@@ -355,135 +313,52 @@ HANDOFF
 - next recommended action:
 ```
 
-Keep it concise and evidence-dense.
-
-The parent must not accept the task solely from HANDOFF text when risk requires
-repository inspection, targeted validation, or independent review.
-
-## Normal-subagent scope
-
-Every normal-subagent assignment must define:
-
-1. readable files/directories;
-2. exact writable files/directories;
-3. forbidden files/directories;
-4. expected deliverable;
-5. acceptance criteria.
-
-Do not allow two subagents to modify the same file concurrently.
-Do not split a small change across multiple implementers merely for structure.
+Keep it concise and evidence-dense. The parent must not accept a task solely from
+HANDOFF text when risk requires repository inspection, targeted validation, or
+independent review.
 
 ## Evidence-based acceptance
 
-Use the smallest sufficient evidence set.
-
-For routine work this may include:
+Use the smallest sufficient trustworthy evidence set. For routine work this may
+include:
 
 1. scoped completion report;
 2. successful validation evidence;
 3. Git status/changed-file inspection;
 4. targeted inspection of risky/integration-sensitive diff sections.
 
-Escalate when evidence is weak, tests fail, uncertainty is reported, unexpected
-files changed, or the task affects sensitive numerics, data integrity, geometry,
-serialization, training/evaluation semantics, public interfaces, destructive
-behavior, or security.
+Escalate validation when evidence is weak, tests fail, uncertainty is reported,
+unexpected files changed, or work affects sensitive numerics, data integrity,
+geometry, serialization, training/evaluation semantics, public interfaces,
+destructive behavior, or security.
 
-## Normal-subagent lifecycle
+## Failure, blockers, and fixer flow
 
-`delegate -> monitor -> wait -> collect -> inspect -> validate -> continue`
-
-State handling:
-
-- `RUNNING` — continue monitoring;
-- `COMPLETED` — collect and validate;
-- `FAILED` — collect failure evidence;
-- `BLOCKED` — collect blocker evidence and apply a decision gate.
-
-Launching a subagent does not complete the parent task.
-
-## No premature conclusion
-
-Do not force a running worker to return early while it is still collecting
-required evidence.
-
-Do not send instructions such as:
-
-- `return immediately`;
-- `stop now and summarize`;
-- `give PASS/BLOCKING now`;
-- `finish with current evidence`.
-
-This rule applies to healthy workers. It does not prohibit the main agent from
-terminating a worker after concrete infrastructure-failure evidence has been
-established under the execution-mode escalation policy.
-
-## Monitoring cadence
-
-For a healthy normal subagent, prefer sparse monitoring. Roughly 5-10 minute
-checks are normally sufficient for moderate or Level 3 work unless new output,
-expected command completion, failure, or infrastructure issues justify earlier
-inspection.
-
-Routine `RUNNING -> RUNNING` polls should remain internal and should not produce
-repetitive user-facing commentary.
-
-For automatically created Worktree Chats/tasks, prefer platform task-state and
-result retrieval over conversational polling.
-
-If multiple normal workers have already shown the same non-responsive behavior,
-do not restart the monitoring clock indefinitely for each replacement worker.
-Apply the execution-mode escalation policy.
-
-## Decision gates
-
-Ask the user only when approval, scope expansion, destructive action,
-experimental protocol, credentials/permissions, materially different choices,
-manual top-level-thread fallback requiring user action, or an explicit
-tool/runtime confirmation requirement is genuinely present.
-
-Do not ask the user merely to approve internal orchestration choices for work
-that is already authorized.
-
-Do not ask the user to perform manual handoff if the platform can create and
-retrieve the independent task automatically.
-
-## Failure and blocker policy
-
-Collect evidence before changing anything.
-
-Record as relevant: command, exit code, traceback, affected stage, process/task
-state, generated artifacts, last completed unit, configuration, Git state, and
-task/thread IDs.
+Collect evidence before changing anything. Record as relevant: command/exit code,
+traceback, affected stage, worker/task/process state, generated artifacts, last
+completed unit, configuration, Git state, and task/thread IDs.
 
 Do not hide failed attempts or classify infrastructure interruption as a
-code/model defect without evidence.
+repository/model defect without evidence.
 
 A blocker must be concrete, such as reproducible test failure, missing required
 input, permission failure, incompatible interface, contradictory validated data,
-unsafe output behavior, an undefined required protocol decision, or a verified
-worker/task infrastructure failure that prevents the selected execution mode.
+unsafe output behavior, undefined required protocol decision, or verified
+infrastructure failure preventing every supported execution mode.
 
-Worker-channel failure is not automatically a repository blocker. When another
-supported execution mode exists, escalate first.
-
-## Fixer flow
-
-Use a narrowly scoped fixer for a small defect.
-
-If the fix itself is substantial, run execution-mode selection again and prefer
-an automatically created independent Worktree Chat/task when available.
+Use a narrowly scoped fixer for a small defect. If the fix is substantial, run
+execution-mode selection again.
 
 After a fix:
 
-`relevant test -> affected test group -> broader validation when appropriate`
+`focused test -> affected test group -> broader validation when appropriate`
 
 Repeat independent review when correctness or safety was involved.
 
 ## Context compaction
 
-After compaction, re-read authoritative files/spec sections required for a
-correctness-sensitive conclusion.
+After compaction, re-read authoritative files/spec sections required for
+correctness-sensitive conclusions.
 
-Compaction does not authorize abandoning the task or recursively changing
-execution mode.
+Compaction does not authorize abandoning the task, weakening validation, or
+recursively changing execution mode.
