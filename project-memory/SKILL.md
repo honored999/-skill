@@ -1,6 +1,6 @@
 ---
 name: project-memory
-description: Maintain concise repository-local project state across Codex sessions, terminals, branches, and accepted worktree tasks. Use when `.project-memory/` exists, when repository instructions require project memory, when initializing repository memory, at repository-task startup, or when synchronizing verified status/goals/next actions/recent history before completion.
+description: Maintain concise repository-level project state across Codex sessions, terminals, branches, and accepted worktree tasks. Use when `.project-memory/` exists, when repository instructions require project memory, when initializing repository memory, at repository-task startup, or when synchronizing verified status/goals/next actions/recent history before completion.
 ---
 
 # Project memory
@@ -34,6 +34,42 @@ more:
 
 Do not add extra memory files merely for completeness.
 
+## Canonical integration branch
+
+Repository-level project memory is canonical on the configured integration
+branch, for example `main` or `master`.
+
+Repository instructions should declare it, preferably as:
+
+`Integration branch: <INTEGRATION_BRANCH>`
+
+When working directly on the integration branch, read the local
+`.project-memory/`.
+
+When working on another branch or in an independent worktree, prefer the
+integration-branch memory as the latest accepted repository-level state, for
+example:
+
+```text
+git show <INTEGRATION_BRANCH>:.project-memory/STATUS.md
+git show <INTEGRATION_BRANCH>:.project-memory/GOALS.md
+git show <INTEGRATION_BRANCH>:.project-memory/NEXT.md
+```
+
+Read recent `LOG.md` entries from the same canonical branch when useful.
+
+The `.project-memory/` checked out inside a non-integration worktree is a
+branch-local snapshot. Do not automatically treat it as the latest project-wide
+state.
+
+If the integration branch is not configured or cannot be determined safely, do
+not guess. Treat local memory as branch-local and report the limitation when it
+matters.
+
+If the integration branch has accepted-but-uncommitted memory changes in another
+worktree, `git show` cannot see them. Do not claim cross-worktree visibility that
+Git does not provide.
+
 ## Authority
 
 When sources disagree, prefer current authoritative evidence in this order as
@@ -43,7 +79,8 @@ applicable:
 2. applicable `AGENTS.md` and task/spec documents;
 3. current repository/worktree contents and Git state;
 4. trustworthy tests/validation/runtime evidence;
-5. `.project-memory/` summary.
+5. canonical integration-branch `.project-memory/` summary;
+6. branch-local memory snapshots.
 
 Treat project memory as potentially stale until checked against the current
 checkout for correctness-sensitive work.
@@ -183,19 +220,25 @@ memory.
 
 ## Task startup
 
-When `.project-memory/` exists:
+At task startup:
 
-1. read `STATUS.md`;
-2. read `GOALS.md`;
-3. read `NEXT.md`;
-4. read only the recent part of `LOG.md` when useful;
-5. compare relevant claims with the current branch/worktree and task request.
+1. identify the configured integration branch;
+2. determine whether the current checkout is the integration branch or another
+   branch/worktree;
+3. load canonical `STATUS.md`, `GOALS.md`, and `NEXT.md` from the integration
+   branch when available;
+4. read recent canonical `LOG.md` entries only when useful;
+5. compare relevant claims with the current checkout and task request.
 
 Do not perform a broad repository reread solely because memory exists. Its
 purpose is to reduce rediscovery.
 
-If memory is obviously stale, continue from authoritative repository evidence
-and repair memory at the normal completion sync.
+When local worktree memory differs from canonical memory, interpret the
+difference as branch-local context until accepted/integrated evidence proves
+otherwise.
+
+If canonical memory is stale, continue from authoritative repository evidence and
+repair it during the normal completion sync when this agent owns that sync.
 
 ## Completion sync
 
@@ -232,21 +275,22 @@ is unclear, report the conflict rather than overwriting it.
 
 ## Worktree ownership
 
-A task-local HANDOFF and repository project memory have different roles:
+A task-local HANDOFF and canonical project memory have different roles:
 
 - HANDOFF: evidence and result from one worker/task;
-- project memory: accepted repository-level state for future sessions.
+- canonical project memory: accepted repository-level state for future sessions.
 
 An independent worker/worktree created by another parent agent must not edit
-`.project-memory/` unless its task brief explicitly grants memory ownership.
-It should return its normal concise HANDOFF instead.
+canonical `.project-memory/` unless its task brief explicitly grants memory
+ownership. It should return its normal concise HANDOFF instead.
 
-The parent/main agent owns memory synchronization after it validates or accepts
-the worker result. This prevents multiple worktrees from racing on the same
-status files and prevents rejected/unmerged work from becoming "current state".
+The parent/main agent owns canonical memory synchronization after it validates
+and accepts/integrates the worker result. This prevents multiple worktrees from
+racing on status files and prevents rejected/unmerged branch-local work from
+becoming current project state.
 
-A top-level agent directly owning a repository task may update project memory as
-part of that task.
+A top-level agent directly owning work on the integration branch may update
+canonical project memory as part of that task.
 
 ## Git behavior
 
@@ -279,11 +323,11 @@ worker task
 -> HANDOFF
 -> parent inspection/validation
 -> accept/integrate
--> project-memory sync
+-> canonical project-memory sync
 -> final report
 ```
 
-Project-memory sync does not replace validation or independent review.
+Canonical project-memory sync does not replace validation or independent review.
 
 ## Final quality check
 

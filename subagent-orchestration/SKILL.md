@@ -11,7 +11,7 @@ Use delegated workers to reduce duplicated repository reading, execution risk,
 and main-agent context usage.
 
 The main agent owns planning, execution-mode selection, integration, acceptance,
-Git coordination, and final reporting.
+Git coordination, reviewer/fixer/validator creation, and final reporting.
 
 Normal subagents use the environment's configured model/reasoning defaults.
 For substantial independent work, prefer `LunaMax` unless the user requests
@@ -68,23 +68,21 @@ debugging, or verification define **what** work should happen and in what order.
 They do not decide **who** owns implementation.
 
 Resolve execution mode before the first implementation write whenever practical.
-A phrase such as `inline executing-plans` does not authorize the parent to bypass
-the selected worker mode.
 
 When **normal subagent** is selected:
 
-- the parent may write or update coordination-only artifacts such as the plan,
-  task brief, review notes, or validation checklist;
-- one scoped normal subagent should own the implementation lane;
-- RED test edits and the corresponding GREEN production edits normally belong to
+- the parent may write coordination-only artifacts such as plans, task briefs,
+  review notes, or validation checklists;
+- one scoped normal subagent owns the implementation lane;
+- RED test edits and corresponding GREEN production edits normally belong to
   that same implementation owner;
-- the parent must not directly edit source/test files in that owned lane while the
-  worker is active;
+- the parent must not directly edit source/test files in that owned lane while
+  the worker is active;
 - a later read-only reviewer does not retroactively satisfy implementation
   delegation.
 
-When **independent Worktree Chat/task** is selected, the existing independent-task
-rule still applies: the parent must not continue the same implementation.
+When **independent Worktree Chat/task** is selected, the parent must not continue
+the same implementation.
 
 If the selected worker interface is unavailable or repeatedly fails, follow the
 worker-channel escalation policy instead of silently absorbing implementation
@@ -93,11 +91,10 @@ fallback when supported delegation paths are unavailable and the task can still
 be completed safely.
 
 If the parent already made implementation edits before detecting an orchestration
-mismatch, do **not** spawn another worker merely to rewrite or duplicate the same
-diff for procedural purity. Freeze further overlapping parent edits, inspect the
-current ownership/state, delegate only genuinely remaining non-overlapping work
-when useful, and continue review/validation. Record the orchestration deviation
-in the final report.
+mismatch, do not spawn another worker merely to rewrite the same diff for
+procedural purity. Freeze further overlapping parent edits, inspect current
+ownership/state, delegate only genuinely remaining non-overlapping work when
+useful, and record the orchestration deviation in the final report.
 
 ### Normal subagent rules
 
@@ -105,14 +102,24 @@ Typical lifecycle:
 
 `delegate -> monitor sparsely -> collect -> inspect -> validate`
 
-A normal subagent must complete, return `BLOCKED`, or return `FAILED`. It must not
-switch itself into another top-level execution mode. Elapsed time or context
-compaction alone is not a blocker.
+A normal subagent owns only the lane assigned by the main agent. It must complete,
+return `BLOCKED`, or return `FAILED` with evidence.
 
-For a localized TDD task, prefer one normal subagent to carry the complete
-`RED -> minimal GREEN -> focused validation` implementation loop within its
-declared write scope. The parent owns acceptance and broader validation, not the
-same source/test edits.
+A normal subagent must **not** create, delegate to, or spawn any other worker,
+subagent, reviewer, validator, fixer, or independent task.
+
+Reviewer creation, fixer creation, validation-worker creation, and execution-mode
+escalation are owned by the main agent.
+
+A normal subagent may run tests and perform self-checks, but self-review does not
+count as independent review.
+
+It must not switch itself into another top-level execution mode. Elapsed time or
+context compaction alone is not a blocker.
+
+For localized TDD, prefer one normal subagent to carry the complete
+`RED -> minimal GREEN -> focused validation` loop within its declared write scope.
+The parent owns acceptance and broader validation, not the same source/test edits.
 
 ### Independent task rules
 
@@ -136,8 +143,7 @@ process is persistent.
 ## Work ownership and scope
 
 Each writable component or implementation lane has exactly one active
-implementation owner. Planning ownership is separate from implementation
-ownership: the parent may own the plan while a worker owns the implementation.
+implementation owner.
 
 Do not assign overlapping implementation responsibility to multiple workers even
 when their nominal file lists differ. Parallel workers are appropriate only when
@@ -228,7 +234,8 @@ task and must not hand that core task to another independent task/thread.
 
 It may use a small number of narrowly scoped normal subagents for focused
 read-only investigation, targeted tests, narrow review, or small fixer work.
-Those subagents must not recursively create workers for the same core task.
+Those normal subagents inherit the normal-subagent no-recursion rule and must not
+create any further worker/reviewer/fixer/validator/task.
 
 If the independent worker cannot complete within scope, return `BLOCKED` with
 concrete evidence.
