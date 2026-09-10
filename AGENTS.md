@@ -38,18 +38,42 @@ not silently weaken repository-level safety rules.
 
 Use applicable installed skills:
 
-- `subagent-orchestration` — normal-subagent delegation, automatic independent
-  Worktree Chat/task creation, LunaMax independent workers, result collection,
-  manual top-level-thread fallback, monitoring, fixer flow, and acceptance.
-- `project-memory` — concise repository-level state for cross-session, cross-terminal,
-  branch, and worktree continuity.
-- `level3-review` — independent review for high-risk/correctness-sensitive work.
+- `subagent-orchestration` — implementation-mode selection, scoped normal
+  subagents, independent Worktree Chat/tasks for substantial implementation,
+  ordinary independent reviewer conversations, monitoring, fixer flow, and
+  acceptance.
+- `project-memory` — concise repository-level state for cross-session,
+  cross-terminal, branch, and worktree continuity.
+- `level3-review` — independent read-only review for high-risk/correctness-
+  sensitive work, normally through a separate ordinary reviewer conversation.
 - `test-validation` — TDD, focused/affected/full validation, test evidence, and
   temporary-test-artifact discipline.
 - `scientific-experiment-integrity` — scientific experiments, leakage prevention,
   preflight/formal separation, reproducibility, and result integrity.
 
 Project-local skills may add domain-specific workflows.
+
+## Main-agent role
+
+The main agent is coordinator, architect/planner, integration manager, acceptance
+decision maker, reviewer coordinator when justified, Git coordinator, and final
+reporter.
+
+Production source/test implementation is delegated by default according to
+`subagent-orchestration`. Task smallness alone does not justify direct main-agent
+implementation.
+
+Use `subagent-orchestration` to select implementation mode:
+
+- normal scoped `Luna xhigh` subagent for localized/short implementation;
+- independent `LunaMax` Worktree Chat/task for substantial implementation when
+  isolation or context separation is useful;
+- persistent external process for genuinely long execution.
+
+Choose review strength separately from implementation mode. For Level 3 review,
+prefer a separate ordinary read-only `LunaMax` reviewer conversation. Do not
+create a reviewer worktree merely to satisfy independence; use one only when an
+isolated checkout is materially necessary to inspect the intended final state.
 
 ## Project memory
 
@@ -63,36 +87,8 @@ Memory layout:
 
 `.project-memory/{STATUS.md,GOALS.md,NEXT.md,LOG.md}`
 
-At repository-task startup, load project memory according to the
-`project-memory` skill.
-
-For repository-modifying tasks, synchronize accepted project state before
-completion when applicable.
-
 Independent workers must not modify canonical project memory unless explicitly
 assigned memory ownership.
-
-Project-specific instructions may define what information belongs in memory.
-
-## Main-agent role
-
-The main agent is coordinator, architect/planner, integration manager, acceptance
-decision maker, reviewer coordinator when justified, Git coordinator, and final
-reporter.
-
-Preserve main-agent context for architecture, protocol, integration, acceptance,
-and user-facing decisions.
-
-Use `subagent-orchestration` to select the execution mode:
-
-- normal scoped subagent for localized/short work;
-- automatically created independent Worktree Chat/task for substantial or
-  long-running implementation/review work when supported;
-- user-created top-level LunaMax thread only as fallback when automatic creation
-  or result retrieval is unavailable;
-- persistent external process for genuinely long execution.
-
-Do not routinely reconstruct a trusted worker's full local investigation.
 
 ## Scope and implementation economy
 
@@ -112,16 +108,15 @@ Assume existing uncommitted changes may belong to the user.
 
 Do not reset, overwrite, restore, stash, delete, or commit unrelated user work.
 
-Do not create nested Git repositories, force-push, rewrite history without
-authorization, or push unless requested.
+Do not force-push or rewrite history without authorization.
+
+Do not push unless requested.
 
 Before commit inspect:
 
 - `git status`
 - `git diff`
 - `git diff --check`
-
-Stage explicit intended files when unrelated changes may exist.
 
 After staging inspect:
 
@@ -135,15 +130,9 @@ files.
 
 Treat real datasets and user data as read-only by default.
 
-Do not overwrite, rename, convert in place, delete, or silently repair raw data.
-
 Keep derived data separate from raw data.
 
 Synthetic results must not be presented as real experimental results.
-
-Store generated artifacts under dedicated generated-output directories.
-
-Enforce output-root boundaries using normalized resolved paths.
 
 ## Production and tests
 
@@ -151,35 +140,13 @@ Do not weaken production behavior merely to make tests pass.
 
 Tests should exercise real production logic whenever practical.
 
-Use `test-validation` for detailed validation strategy.
-
-## Dependencies and security
-
-Do not casually install or broadly upgrade dependencies.
-
-Never expose or commit credentials, tokens, keys, passwords, or private user
-data.
-
-Do not bypass access restrictions or execute destructive commands without clear
-need and authorization.
-
-## Documentation and source fidelity
-
-Documentation must reflect verified behavior.
-
-When implementing from a paper/spec/API/protocol/reference project, distinguish
-source-specified behavior, project assumptions, deliberate deviations, and
-unresolved details.
-
-Do not silently replace ambiguity with common practice.
-
 ## Final acceptance
 
 Before completion, verify relevant acceptance criteria: requested behavior,
 trustworthy validation, reviewer blockers resolved when required, no unrelated
-changes, generated outputs isolated, raw/user data unchanged, intended files
-only committed, documentation consistent with verified behavior, and project
-memory synchronized when the task changed repository state.
+changes, raw/user data unchanged, intended files only committed, documentation
+consistent with verified behavior, and project memory synchronized when
+applicable.
 
 ## Final report
 

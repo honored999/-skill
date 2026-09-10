@@ -13,6 +13,29 @@ cross-module behavior.
 
 Review is risk-based, not mandatory for every task.
 
+Independent review means a separate reviewer context that did not implement the
+change. It does **not** require a separate Git worktree by default.
+
+## Default reviewer form
+
+For Level 3 review, prefer a separate ordinary reviewer conversation:
+
+- explicitly request `LunaMax` when supported;
+- keep the reviewer read-only;
+- provide the exact final commit/diff/snapshot;
+- keep the implementation owner separate from the reviewer;
+- collect `PASS`, `BLOCKING`, and optional `NON-BLOCKING` findings.
+
+Do not create a Worktree Chat merely to satisfy reviewer independence.
+
+Use a reviewer worktree only when an isolated checkout is materially necessary,
+for example when the reviewer must run commands against its own filesystem state,
+the intended target cannot otherwise be exposed reliably, or isolation is
+required for safe inspection.
+
+Use `subagent-orchestration` for reviewer creation, profile selection, target
+exposure, lifecycle, and fallback rules.
+
 ## Typical Level 3 triggers
 
 Use Level 3 review when changes affect one or more of:
@@ -49,6 +72,9 @@ A reviewer must independently inspect enough evidence to support its conclusion.
 Existing implementer/fixer/test evidence may be used as background but must not
 substitute for checking the actual risky code path.
 
+Main-agent inspection and implementer self-review do not count as independent
+Level 3 review.
+
 ## Required outcomes
 
 A reviewer must distinguish:
@@ -69,74 +95,33 @@ Do not classify style preferences, optional extra tests, documentation polish,
 harmless warnings, minor optimization, or speculative concerns as blocking by
 themselves.
 
-## Evidence completeness
-
-Do not return PASS before required evidence is collected.
-
-If a required specification, file, runtime artifact, or authoritative source is
-missing:
-
-1. try to locate it within allowed scope;
-2. if unavailable, report the evidence gap;
-3. do not guess its contents;
-4. do not silently convert the gap into PASS.
-
-If context compaction occurs during review, re-read the authoritative spec
-sections and high-risk code required for the final conclusion.
-
-## No premature reviewer termination
-
-The main agent must allow the reviewer to finish its assigned evidence
-collection.
-
-While the reviewer is:
-
-- reading required files/specifications;
-- tracing a relevant call path;
-- inspecting the final diff;
-- running required focused regression;
-- resolving an evidence gap;
-
-do not force a terminal conclusion.
-
-Use `subagent-orchestration` for lifecycle and sparse-monitoring rules.
-
-A premature reviewer conclusion is not valid final review evidence for a
-correctness-sensitive task.
-
 ## Validation sequence
 
 Typical workflow:
 
-`implementer -> focused tests -> affected tests -> independent reviewer`
+`implementer -> focused tests -> affected tests -> ordinary independent reviewer conversation`
 
 If `BLOCKING`:
 
 `fixer -> focused revalidation -> affected revalidation -> focused independent re-review`
 
-Run a full suite when changed shared/high-risk code justifies it. Do not rerun
-expensive full validation mechanically when focused/affected evidence is
-sufficient.
+A reviewer worktree may be introduced only when evidence access or isolation
+requires it; it is not part of the default Level 3 sequence.
 
 ## Main-agent acceptance after PASS
 
 After reviewer PASS, the main agent should:
 
-- confirm the reviewer examined the intended final diff;
+- confirm the reviewer examined the intended final diff/commit/snapshot;
 - inspect Git status and changed files;
 - inspect targeted high-risk areas if needed;
 - verify visible validation evidence;
 - confirm no blocker remains;
 - perform repository commit checks.
 
-A post-commit audit may validate an existing commit, but do not claim it was a
-pre-commit review if the actual order was different.
-
 ## Suggested output
 
 Keep the review concise.
-
-Example:
 
 `PASS`
 
@@ -149,3 +134,6 @@ Optional:
 
 `NON-BLOCKING`
 - concise evidence-backed risk or improvement
+
+Also record the exact reviewed commit/diff/snapshot identity and requested/
+observed reviewer profile when verifiable.

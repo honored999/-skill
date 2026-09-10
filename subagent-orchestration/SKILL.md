@@ -1,6 +1,6 @@
 ---
 name: subagent-orchestration
-description: Coordinate scoped Codex workers for implementation, testing, auditing, review, fixes, validation, and integration. Use when selecting execution mode, defining worker ownership/scope, choosing worker profiles, creating or monitoring independent tasks, collecting HANDOFFs, escalating failed worker channels, reviewing uncommitted work, or coordinating reviewer/fixer flows.
+description: Coordinate scoped Codex workers for implementation, testing, auditing, review, fixes, validation, and integration. Use when selecting implementation mode, defining worker ownership/scope, choosing worker profiles, creating or monitoring implementation tasks, creating independent reviewer conversations, collecting HANDOFFs, escalating failed worker channels, reviewing uncommitted work, or coordinating reviewer/fixer flows.
 ---
 
 # Subagent orchestration
@@ -10,8 +10,45 @@ description: Coordinate scoped Codex workers for implementation, testing, auditi
 Use delegated workers to reduce duplicated repository reading, execution risk,
 and main-agent context usage.
 
-The main agent owns planning, execution-mode selection, integration, acceptance,
-Git coordination, reviewer/fixer creation, and final reporting.
+The main agent owns planning, implementation-mode selection, integration,
+acceptance, Git coordination, reviewer/fixer creation, and final reporting.
+
+Keep two decisions separate:
+
+- **implementation mode** is chosen mainly from task size, scope, isolation needs,
+  and context pressure;
+- **review strength** is chosen mainly from correctness/safety risk.
+
+A small implementation can still require strong independent review. A large
+implementation does not automatically require a reviewer worktree.
+
+## Default implementation ownership
+
+For repository tasks that modify production source code or tests, the main agent
+must select a delegated implementation owner before the first implementation
+write.
+
+Default ownership:
+
+- localized implementation -> `Luna` with `xhigh` reasoning normal subagent;
+- substantial or multi-module implementation -> independent `LunaMax` Worktree
+  Chat/task.
+
+Task smallness alone is not a reason for direct parent implementation.
+
+The main agent should normally remain coordinator, architect, integrator,
+acceptance owner, reviewer/fixer coordinator, Git coordinator, and final
+reporter.
+
+Direct parent source/test implementation is allowed only when:
+
+- the user explicitly requests parent implementation;
+- no supported worker interface is available;
+- supported worker channels have failed and documented fallback is justified;
+- the remaining edit is coordination/integration glue so small that delegating
+  it would create more risk than value.
+
+If direct parent implementation occurs, record the reason.
 
 ## Worker profiles
 
@@ -19,11 +56,11 @@ Delegated workers must not rely on the main agent's inherited/default model.
 
 Preferred profiles:
 
-- normal scoped subagent, focused fixer, validator, or narrow reviewer:
-  explicitly request `Luna` with `xhigh` reasoning;
-- substantial independent Worktree Chat/task:
+- normal scoped implementation subagent, focused fixer, validator, or narrow
+  low-risk reviewer: explicitly request `Luna` with `xhigh` reasoning;
+- substantial independent Worktree Chat/task used for implementation:
   explicitly request `LunaMax`;
-- Level 3 independent reviewer:
+- Level 3 independent reviewer conversation:
   explicitly request `LunaMax`.
 
 When the platform supports explicit model/reasoning selection, request the
@@ -44,8 +81,9 @@ Authorization for the underlying implementation/review/validation/audit/fixer
 also covers routine worker creation and execution-mode changes needed for that
 same task.
 
-Do not ask separately to create a normal subagent, independent task, reviewer,
-validator, fixer, or to escalate after worker-channel failure.
+Do not ask separately to create a normal subagent, independent implementation
+task, reviewer conversation, validator, fixer, or to escalate after
+worker-channel failure.
 
 Ask the user only for a genuine decision gate:
 
@@ -59,62 +97,39 @@ Ask the user only for a genuine decision gate:
 
 Higher-priority platform/tool confirmation rules always apply.
 
-## Execution modes
+## Implementation execution modes
 
-Choose one primary mode per core task:
+Choose one primary implementation mode per core task:
 
 1. **Normal subagent** — localized work, a few related files, focused bugs/tests,
    small audits/fixers, modest reading, or work that must land directly in a dirty
    worktree an isolated worker cannot safely observe.
-2. **Independent Worktree Chat/task** — substantial or multi-module work,
-   significant repository/paper/spec reading, repeated TDD/debug cycles, broad
-   correctness review, high context pressure, or work benefiting from isolation.
+2. **Independent Worktree Chat/task** — substantial or multi-module
+   implementation, significant repository/paper/spec reading, repeated TDD/debug
+   cycles, high context pressure, or implementation benefiting materially from an
+   isolated checkout.
 3. **Manual top-level-thread fallback** — only when automatic independent-task
    creation/result retrieval is unavailable or the user explicitly prefers it.
-4. **Persistent external process** — multi-hour training, simulations, long builds,
-   or services.
+4. **Persistent external process** — multi-hour training, simulations, long
+   builds, or services.
 
 Do not execute the same core implementation concurrently in multiple modes.
-The parent remains responsible for collecting, validating, and accepting delegated
-results.
+The parent remains responsible for collecting, validating, and accepting
+delegated results.
+
+**Independent review is not an implementation execution mode.** By default,
+independent review uses a separate ordinary reviewer conversation, not another
+worktree.
 
 Direct parent implementation is not a substitute execution mode when a supported
 delegated mode has been selected and is available.
 
-## Planning/TDD skills do not override execution-mode selection
+## Planning/TDD skills do not override implementation ownership
 
-Planning and workflow skills such as `writing-plans`, `executing-plans`, TDD,
-debugging, or verification define **what** work should happen and in what order.
-They do not decide **who** owns implementation.
+Planning and workflow skills define what work should happen and in what order.
+They do not decide who owns implementation.
 
-Resolve execution mode before the first implementation write whenever practical.
-
-When **normal subagent** is selected:
-
-- explicitly request `Luna` with `xhigh` reasoning when supported;
-- the parent may write coordination-only artifacts such as plans, task briefs,
-  review notes, or validation checklists;
-- one scoped normal subagent owns the implementation lane;
-- RED test edits and corresponding GREEN production edits normally belong to
-  that same implementation owner;
-- the parent must not directly edit source/test files in that owned lane while
-  the worker is active;
-- a later read-only reviewer does not retroactively satisfy implementation
-  delegation.
-
-When **independent Worktree Chat/task** is selected:
-
-- explicitly request `LunaMax`;
-- the parent must not continue the same implementation.
-
-If a selected worker interface is unavailable or repeatedly fails, follow the
-worker-channel escalation policy instead of silently absorbing implementation
-into the parent.
-
-If the parent already made implementation edits before detecting an orchestration
-mismatch, do not spawn a worker merely to rewrite the same diff for procedural
-purity. Freeze further overlap, inspect ownership/state, delegate only genuinely
-remaining non-overlapping work when useful, and record the deviation.
+Resolve implementation ownership before the first production source/test write.
 
 ## Normal subagent rules
 
@@ -144,21 +159,21 @@ For localized TDD, prefer one normal subagent to carry the complete
 `RED -> minimal GREEN -> focused validation` loop within its declared write scope.
 The parent owns acceptance and broader validation.
 
-## Independent task rules
+## Independent Worktree implementation rules
 
-When supported:
+When substantial implementation uses an independent Worktree Chat/task:
 
 - explicitly request `LunaMax`;
 - request an isolated worktree when appropriate;
 - record returned task/thread/worktree identifiers;
 - verify returned model/profile metadata when available;
 - record when model selection cannot be set or verified;
-- do not also run a normal subagent for the same core task;
+- do not also run a normal subagent for the same core implementation;
 - do not continue the same implementation in the parent;
 - do not reuse the implementation worker as its independent reviewer.
 
-An independent Worktree Chat/task is the top-level execution worker for its core
-task. It must not hand that same core task to another independent task/thread.
+An independent Worktree Chat/task is the top-level implementation worker for its
+core task. It must not hand that same core task to another independent task/thread.
 
 It may use a small number of narrowly scoped normal subagents for focused
 read-only investigation, targeted tests, narrow review, or small fixer work.
@@ -168,19 +183,56 @@ normal-subagent no-recursion rule.
 If the independent worker cannot complete within scope, return `BLOCKED` with
 concrete evidence.
 
-## Reviewer profile rules
+## Independent reviewer conversations
 
-For a correctness-sensitive Level 3 independent review:
+For correctness-sensitive Level 3 review, prefer a **separate ordinary reviewer
+conversation** with `LunaMax` and read-only scope.
 
-- use a separate reviewer from the implementation owner;
-- explicitly request `LunaMax`;
-- keep the reviewer read-only unless it is later reassigned as a fixer;
-- verify the reviewer actually inspected the intended final diff/snapshot;
-- do not count implementer self-review or main-agent inspection as independent
-  Level 3 review.
+Independent review normally means:
+
+- a separate reviewer context that did not implement the change;
+- the intended final diff/commit/snapshot is explicitly identified;
+- the reviewer stays read-only;
+- the reviewer independently checks the risky code path and evidence;
+- the reviewer returns `PASS`, `BLOCKING`, and optional `NON-BLOCKING` findings.
+
+A reviewer does **not** need a separate worktree merely to count as independent.
+Do not create a Worktree Chat only for procedural independence.
+
+Use a reviewer worktree only when an isolated checkout is materially necessary,
+for example when:
+
+- the reviewer must run commands against an isolated filesystem state;
+- the target commit cannot otherwise be inspected reliably;
+- platform snapshot/diff/patch access cannot expose the intended state;
+- repository state or tooling makes a separate checkout safer than read-only
+  inspection in an ordinary reviewer conversation.
 
 For a narrow, low-risk read-only review that does not require Level 3,
 `Luna` with `xhigh` reasoning is sufficient by default.
+
+Main-agent inspection and implementer self-review do not count as independent
+Level 3 review.
+
+## Review target and uncommitted work
+
+An independent reviewer must inspect the actual intended change set, not merely
+the baseline branch.
+
+For committed work, prefer the exact commit/diff plus relevant tests and
+contracts.
+
+For uncommitted work, expose the intended review target without mutating or
+cleaning the source worktree. Preferred approaches:
+
+1. platform-supported read-only working-tree snapshot/diff;
+2. review-only patch/snapshot containing intended tracked/untracked changes plus
+   the exact baseline commit;
+3. when appropriate and authorized, a temporary review commit/ref preserving the
+   exact intended change set without rewriting unrelated history.
+
+The reviewer remains read-only unless reassigned as a fixer. Do not stash, reset,
+clean, overwrite, or silently commit unrelated user work to make review easier.
 
 ## Fixer and validator profiles
 
@@ -191,229 +243,77 @@ For a focused fixer or validation worker:
 - do not allow it to expand into a second implementation owner for unrelated
   work.
 
-If the fix becomes substantial or multi-module, run execution-mode selection
-again and normally escalate to an independent `LunaMax` Worktree task.
+If the fix becomes substantial or multi-module, run implementation-mode
+selection again and normally escalate to an independent `LunaMax` Worktree task.
 
-## Persistent-process rules
+After a correctness-sensitive fix, repeat independent review against the new
+final state. A separate ordinary `LunaMax` reviewer conversation remains the
+default; a reviewer worktree is optional and evidence-driven.
 
-Record PID/process identity, logs, run/configuration identity, and output location
-when relevant. A worker remaining `RUNNING` does not guarantee the underlying OS
-process is persistent.
+## Monitoring and escalation
 
-## Work ownership and scope
+Healthy workers/reviewers should be monitored sparsely. Do not generate
+repetitive user-facing `RUNNING -> RUNNING` updates or force a healthy worker to
+stop for an early summary.
 
-Each writable component or implementation lane has exactly one active
-implementation owner. Planning ownership is separate from implementation
-ownership: the parent may own the plan while a worker owns implementation.
-
-Do not assign overlapping implementation responsibility to multiple workers even
-when nominal file lists differ. Parallel workers are appropriate only when write
-scopes and interface responsibilities are independent.
-
-Reviewers/validators remain read-only unless explicitly reassigned as fixers.
-Never allow two workers to modify the same file concurrently.
-
-Every writable worker assignment must define:
-
-1. readable files/directories;
-2. exact writable files/directories;
-3. forbidden files/directories;
-4. expected deliverable;
-5. acceptance criteria.
-
-Workers must not expand their own scope. Do not split a small change across
-multiple implementers merely for structure.
-
-## Independent-task lifecycle
-
-When creating an independent task:
-
-1. define goal and acceptance criteria;
-2. explicitly request `LunaMax`;
-3. request an isolated worktree when appropriate;
-4. record available client-task, formal-task, thread/chat, project, and worktree
-   identifiers;
-5. do not treat only `queued`, `setup`, or a client-side ID as proof that a usable
-   worker exists;
-6. resolve formal task/thread ID when setup is asynchronous;
-7. keep the parent worktree unchanged while the worker owns the task.
-
-If creation fails because of a clear parameter/schema mismatch, retry with the
-correct structure. Do not weaken reviewer independence merely because creation
-failed once.
-
-Preferred lifecycle:
-
-`create -> record IDs -> monitor sparsely -> detect terminal state -> read result -> collect HANDOFF -> validate -> continue`
-
-When supported, reopen/read the task after completion and collect `HANDOFF` or
-`PASS/BLOCKING` automatically. Do not require manual copy/paste when reliable
-retrieval exists, and do not assume completion automatically wakes a paused
-parent.
-
-If automatic creation/result retrieval is unavailable, use manual top-level
-fallback and ask the user to return the final `HANDOFF`.
-
-## Monitoring, escalation, and stale tasks
-
-Healthy workers should be monitored sparsely. Do not generate repetitive
-user-facing `RUNNING -> RUNNING` updates or force a healthy worker to stop for an
-early summary.
-
-Before replacing a worker/reviewer, reopen/re-list existing task/thread IDs for
-the same core task and consume any valid terminal result already produced.
-Do not create replacements merely because setup metadata is stale.
-
-Worker-channel failure evidence may include:
-
-- repeated absence of usable progress or HANDOFF;
-- ignored status requests;
-- usable completion only after forced termination;
-- isolated changes failing to synchronize reliably;
-- repeated narrowed workers failing without a repository/test/data blocker.
-
-Normally, after two evidenced failures of the same normal-subagent channel for
-the same task class, stop respawning equivalents and escalate:
+Normally, after two evidenced failures of the same normal-subagent implementation
+channel for the same task class, stop respawning equivalents and escalate:
 
 `normal Luna xhigh subagent -> independent LunaMax Worktree Chat/task -> documented fallback`
 
-The count is a heuristic, not an absolute rule. Escalate earlier/later when
-evidence justifies it.
+Review-channel failure does not imply that a reviewer worktree is required.
+Retry or recreate an ordinary independent reviewer conversation when
+appropriate; use a reviewer worktree only when evidence access or isolation
+materially requires one.
 
-Worker-channel failure is not automatically a repository blocker; use another
-supported mode first when possible.
+## Worker/reviewer briefs
 
-If an older/duplicate task later produces a valid result, consume the useful
-result and avoid duplicate work. Cancel/close obsolete tasks when safely
-supported. Never allow stale workers to continue modifying a scope after
-ownership has moved elsewhere.
-
-## Independent review of uncommitted work
-
-An independent reviewer must inspect the actual intended change set, not merely
-the baseline branch.
-
-Because a new worktree normally cannot see another worktree's dirty/untracked
-changes, expose the intended review target without mutating the source worktree.
-
-Preferred approaches:
-
-1. platform-supported read-only working-tree snapshot/diff;
-2. review-only patch/snapshot containing intended tracked/untracked changes plus
-   the exact baseline commit;
-3. when appropriate and authorized, a temporary review commit/ref preserving the
-   exact intended change set without rewriting unrelated history.
-
-The review brief must identify baseline commit, intended changed/untracked files,
-snapshot/patch/commit identity, what the reviewer is actually inspecting, and
-intentionally excluded files.
-
-The reviewer remains read-only unless reassigned as a fixer. Do not stash, reset,
-clean, overwrite, or silently commit unrelated user work to make review easier.
-If no supported mechanism can expose the real change set safely, report the
-concrete technical blocker.
-
-## Worker task brief
-
-Keep worker briefs self-contained but compact. Include, when relevant:
+Include, when relevant:
 
 - repository/worktree path;
 - current branch/commit and Git state;
-- requested worker profile (`Luna xhigh` or `LunaMax`);
+- requested profile (`Luna xhigh` or `LunaMax`);
 - goal and relevant existing implementation state;
 - authoritative `AGENTS.md`, specs, plans, or source documents;
 - exact read/write/forbidden scope;
 - important invariants;
 - acceptance criteria and required validation;
-- review snapshot/patch identity for uncommitted review;
-- Git/commit instructions;
-- required HANDOFF format.
+- exact review commit/diff/snapshot/patch identity;
+- Git/commit instructions for implementers;
+- required `HANDOFF` or review-result format.
 
 Do not paste the full parent conversation or make workers rediscover already
 settled architecture unnecessarily.
 
-Authoritative context priority:
-
-1. current task brief;
-2. current repository/worktree or exact snapshot;
-3. applicable `AGENTS.md` and project-local instructions;
-4. authoritative task specification/design/source documents.
-
-Shared conversation links are optional background only. If they conflict with
-current authoritative sources, follow the current sources and report the
-discrepancy.
-
 ## HANDOFF
 
-Workers should return:
+Implementation/fixer/validation workers should return concise evidence including:
 
-```text
-HANDOFF
+- status: `COMPLETED` / `BLOCKED` / `FAILED`;
+- worker identity;
+- requested and observed model/profile when verifiable;
+- branch/worktree or exact snapshot;
+- starting commit(s);
+- changed files;
+- implemented behavior;
+- tests/validation;
+- commit hash if committed;
+- git status;
+- unresolved issues;
+- scope deviations;
+- next recommended action.
 
-- status: COMPLETED / BLOCKED / FAILED
-- worker/reviewer identity and independence, when relevant:
-- requested model/profile:
-- observed model/profile/reasoning, when verifiable:
-- branch/worktree or exact snapshot:
-- starting/reviewed commit(s):
-- review snapshot/patch, when relevant:
-- changed files:
-- implemented behavior:
-- important design decisions:
-- tests/validation:
-- visible results:
-- reviewer result, if any:
-- commit hash, if committed:
-- git status:
-- raw/user data status, when relevant:
-- real training/server validation, when relevant:
-- unresolved issues:
-- scope deviations:
-- next recommended action:
-```
-
-Keep it concise and evidence-dense. The parent must not accept a task solely from
-HANDOFF text when risk requires repository inspection, targeted validation, or
-independent review.
+Independent reviewers should return concise `PASS` / `BLOCKING` / optional
+`NON-BLOCKING` findings plus the exact reviewed commit/diff/snapshot identity and
+requested/observed reviewer profile when verifiable.
 
 ## Evidence-based acceptance
 
-Use the smallest sufficient trustworthy evidence set. For routine work this may
-include:
-
-1. scoped completion report;
-2. successful validation evidence;
-3. Git status/changed-file inspection;
-4. targeted inspection of risky/integration-sensitive diff sections.
-
-Escalate validation when evidence is weak, tests fail, uncertainty is reported,
-unexpected files changed, or work affects sensitive numerics, data integrity,
-geometry, serialization, training/evaluation semantics, public interfaces,
-destructive behavior, or security.
-
-## Failure, blockers, and fixer flow
-
-Collect evidence before changing anything. Record as relevant: command/exit code,
-traceback, affected stage, worker/task/process state, generated artifacts, last
-completed unit, configuration, Git state, and task/thread IDs.
-
-Do not hide failed attempts or classify infrastructure interruption as a
-repository/model defect without evidence.
-
-A blocker must be concrete, such as reproducible test failure, missing required
-input, permission failure, incompatible interface, contradictory validated data,
-unsafe output behavior, undefined required protocol decision, or verified
-infrastructure failure preventing every supported execution mode.
-
-Use a narrowly scoped `Luna xhigh` fixer for a small defect. If the fix is
-substantial, run execution-mode selection again and normally use `LunaMax`.
-
-After a fix:
-
-`focused test -> affected test group -> broader validation when appropriate`
-
-Repeat independent Level 3 review with `LunaMax` when correctness or safety was
-involved.
+Use the smallest sufficient trustworthy evidence set. Escalate validation when
+evidence is weak, tests fail, uncertainty is reported, unexpected files changed,
+or work affects sensitive numerics, data integrity, geometry, serialization,
+training/evaluation semantics, public interfaces, destructive behavior, or
+security.
 
 ## Context compaction
 
