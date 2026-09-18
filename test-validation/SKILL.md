@@ -16,6 +16,24 @@ Prefer:
 Do not run an expensive full suite merely for ceremony when unchanged
 high-risk behavior is already covered by strong evidence.
 
+## Mandatory resource preflight
+
+Before **every** test or validation command, use `resource-aware-testing`.
+
+Do not run the planned command until CPU, system RAM, GPU utilization, and GPU
+memory pressure have been checked according to that skill.
+
+If any monitored resource is at or above 80%, or the planned command is
+reasonably expected to make any monitored resource reach or exceed 80%, switch
+to the lightest semantically faithful validation.
+
+If no lightweight substitute can validate the required behavior, report the
+missing validation as `DEFERRED_RESOURCE_GUARD` / `NOT_RUN_RESOURCE_GUARD`.
+Never present deferred validation as passed.
+
+Repeat the resource preflight before each later test command; one earlier safe
+reading does not authorize the entire validation sequence.
+
 ## TDD bug-fix flow
 
 For a defect:
@@ -147,6 +165,8 @@ After a narrow fix:
 2. rerun the directly affected group;
 3. broaden only if shared/high-risk code changed or evidence is still weak.
 
+Each command still requires a fresh `resource-aware-testing` preflight.
+
 Do not repeatedly rerun an unchanged full suite when nothing relevant changed.
 
 ## Reporting
@@ -160,6 +180,8 @@ Distinguish:
 - failed;
 - deselected/skipped;
 - known unrelated baseline failure;
+- `DEFERRED_RESOURCE_GUARD`;
+- `NOT_RUN_RESOURCE_GUARD`;
 - not run.
 
 Do not silently hide failures or present partial validation as full validation.
