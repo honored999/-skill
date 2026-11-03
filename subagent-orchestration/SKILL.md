@@ -5,6 +5,29 @@ description: Coordinate scoped Codex workers for implementation, testing, auditi
 
 # Subagent orchestration
 
+## Default manual dispatch policy
+
+The user's standing default is manual dispatch for delegated execution tasks.
+Before implementation, generate a self-contained task brief and a copyable launch
+prompt using `manual-subagent-handoff`. The user chooses and launches the executor,
+including a new conversation, DeepSeekHarness, or another agent/harness.
+Do not automatically spawn workers, reviewers, fixers, validators, replacement
+workers, or user-visible chats unless the user explicitly enables automatic mode.
+This policy also covers later review/fix/validation stages and future tasks until
+explicitly changed. Read-only Q&A does not need a dispatch task brief.
+
+Default requested model/profile for every delegated role: `gpt6.1sol low`.
+Treat this as the user's exact configuration label, not a verified API model ID.
+Task size or review level does not silently change the profile. If unavailable or
+executor choice is unclear, leave selection to the user; do not choose a substitute.
+Separate executor selection from requirements: document genuine unresolved task
+requirements and block only dependent work rather than inventing requirements.
+
+All delegated executors, including independent worktree and external harness
+workers, are leaf workers. They must not create further agents or tasks.
+The main agent prepares subsequent briefs and accepts returned HANDOFF evidence.
+Manual dispatch does not authorize the parent to take over production source/tests.
+
 ## Purpose
 
 Use delegated workers to reduce duplicated repository reading, execution risk,
@@ -19,7 +42,7 @@ Keep these decisions separate:
 - **implementation mode** depends mainly on task size, scope, isolation needs,
   and context pressure;
 - **review strength** depends mainly on correctness/safety risk;
-- **worker transport** may be automatic or user-requested manual dispatch;
+- **worker transport** defaults to user manual dispatch; automatic mode requires an explicit override;
 - **test intensity** may be reduced by `resource-aware-testing`, but validation
   claims must remain truthful.
 
@@ -34,8 +57,8 @@ write.
 
 Default ownership:
 
-- localized implementation -> normal `Luna` with `xhigh` reasoning;
-- substantial or multi-module implementation -> independent `LunaMax` Worktree
+- localized implementation -> normal `gpt6.1sol low`;
+- substantial or multi-module implementation -> independent `gpt6.1sol low` Worktree
   Chat/task.
 
 Task smallness alone is not a reason for direct parent implementation.
@@ -66,12 +89,12 @@ Delegated workers must not silently inherit the main agent's default profile.
 
 Preferred profiles:
 
-- normal scoped implementation worker -> `Luna xhigh`;
-- focused fixer -> `Luna xhigh`;
-- validator -> `Luna xhigh`;
-- narrow low-risk reviewer -> `Luna xhigh`;
-- substantial independent Worktree implementation -> `LunaMax`;
-- Level 3 independent reviewer -> `LunaMax`.
+- normal scoped implementation worker -> `gpt6.1sol low`;
+- focused fixer -> `gpt6.1sol low`;
+- validator -> `gpt6.1sol low`;
+- narrow low-risk reviewer -> `gpt6.1sol low`;
+- substantial independent Worktree implementation -> `gpt6.1sol low`;
+- Level 3 independent reviewer -> `gpt6.1sol low`.
 
 When the platform supports explicit model/reasoning selection, request the
 preferred profile directly.
@@ -79,14 +102,13 @@ preferred profile directly.
 When worker metadata exposes model/profile/reasoning information, verify it.
 Do not claim a requested profile was used when it cannot be verified.
 
-If the exact preferred profile is unavailable, use the closest supported
-Luna-xhigh/Max profile and record the deviation.
+If the exact preferred profile is unavailable, leave the replacement choice to the user.
 
 A user-specified worker/model override takes precedence.
 
 ## Authorization and decision gates
 
-Authorization for the underlying implementation/review/validation/audit/fixer
+Only when the user explicitly enables automatic dispatch, authorization for the underlying implementation/review/validation/audit/fixer
 also covers routine worker creation and execution-mode changes needed for that
 same task.
 
@@ -137,7 +159,7 @@ While manual mode applies:
 - if task-scoped manual mode remains active, subsequent reviewer/fixer/validator
   steps must also be emitted as manual prompts.
 
-Manual mode may be one-shot or task-scoped. If scope is unclear, use one-shot.
+Manual dispatch is the persistent default. One-shot or task-scoped exceptions apply only when explicitly requested; finishing a task does not disable the default.
 
 ## Implementation execution modes
 
@@ -150,7 +172,7 @@ Choose one primary implementation mode per core task:
    implementation, significant repository/paper/spec reading, repeated
    TDD/debug cycles, high context pressure, or implementation benefiting
    materially from an isolated checkout.
-3. **Manual dispatch** — only when the user explicitly requests manual worker
+3. **Manual dispatch** — the standing default; also when the user requests manual worker
    launching, or when automatic worker creation is unavailable and manual
    top-level handoff is the documented fallback.
 4. **Persistent external process** — multi-hour training, simulations, long
@@ -183,7 +205,7 @@ When normal-subagent implementation is selected:
 
 When independent Worktree implementation is selected:
 
-- explicitly request `LunaMax`;
+- explicitly request `gpt6.1sol low`;
 - request isolation when materially useful;
 - the parent must not continue the same implementation.
 
@@ -275,16 +297,16 @@ A focused fixer is appropriate when:
 
 Focused fixer profile:
 
-`Luna xhigh`
+`gpt6.1sol low`
 
 If the fix becomes substantial or multi-module, rerun implementation-mode
-selection and normally use `LunaMax` Worktree implementation.
+selection and normally use `gpt6.1sol low` Worktree implementation.
 
 ## Independent Worktree implementation rules
 
 When substantial implementation uses an independent Worktree Chat/task:
 
-- explicitly request `LunaMax`;
+- explicitly request `gpt6.1sol low`;
 - request an isolated worktree when appropriate;
 - record returned task/thread/worktree identifiers;
 - verify returned profile metadata when available;
@@ -298,14 +320,7 @@ core task.
 
 It must not hand that same core task to another independent task/thread.
 
-It may use a small number of narrowly scoped normal subagents for:
-
-- focused read-only investigation;
-- targeted tests;
-- narrow review;
-- small fixer work.
-
-Those normal subagents remain leaf workers and should use `Luna xhigh`.
+It must not create any nested subagents, reviewers, fixers, validators, or tasks. Return needs to the main agent for a separate manual dispatch.
 
 If the independent worker cannot complete within scope, return `BLOCKED` with
 concrete evidence.
@@ -313,7 +328,7 @@ concrete evidence.
 ## Independent reviewer conversations
 
 For correctness-sensitive Level 3 review, prefer a separate ordinary reviewer
-conversation using `LunaMax` with read-only scope.
+conversation using `gpt6.1sol low` with read-only scope.
 
 Independent review means:
 
@@ -335,7 +350,7 @@ for example when:
 - platform snapshot/diff/patch access cannot expose the intended state;
 - repository/tooling conditions make separate checkout materially safer.
 
-For narrow low-risk review that does not require Level 3, `Luna xhigh` is
+For narrow low-risk review that does not require Level 3, `gpt6.1sol low` is
 sufficient by default.
 
 Main-agent inspection and implementer self-review do not count as independent
@@ -443,7 +458,7 @@ Worker-channel failure evidence may include:
 Normally, after two evidenced failures of the same normal-subagent channel for
 the same task class, stop respawning equivalents and escalate:
 
-`normal Luna xhigh -> independent LunaMax Worktree -> documented fallback`
+`normal gpt6.1sol low -> independent gpt6.1sol low Worktree -> documented fallback`
 
 This count is heuristic, not absolute.
 
@@ -599,7 +614,7 @@ After a focused fix:
 Each test command still requires resource preflight.
 
 When correctness/safety is involved, repeat independent Level 3 review using a
-separate ordinary `LunaMax` reviewer conversation by default.
+separate ordinary `gpt6.1sol low` reviewer conversation by default.
 
 ## Context compaction
 

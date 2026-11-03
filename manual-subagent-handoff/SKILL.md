@@ -1,192 +1,122 @@
 ---
 name: manual-subagent-handoff
-description: User-requested manual delegation mode. Use when the user asks to manually open a worker, reviewer, fixer, or validator chat; asks for a prompt to send to a new agent; or asks not to auto-dispatch subagents. Generate a self-contained dispatch prompt, require a terminal HANDOFF, and resume orchestration when the user pastes the HANDOFF back.
+description: Prepare task briefs and copyable launch prompts for user-dispatched execution in a new conversation, DeepSeekHarness, or another agent/harness. Use by default for delegated implementation, review, fixes, and validation; resume acceptance from returned HANDOFF evidence.
 ---
 
-# Manual subagent handoff
+# Manual task dispatch and handoff
 
-## Purpose
+## Standing workflow
 
-Use only when the user explicitly requests manual delegation.
+Manual dispatch is the user's persistent default, across tasks, until explicitly
+changed. Prepare the execution package; the user chooses and launches the executor.
 
-Manual delegation replaces automatic worker creation with:
+`main agent -> task brief + launch prompt -> user dispatches -> executor -> terminal HANDOFF -> main agent verifies and continues`
 
-`main agent -> generated prompt -> user opens new chat -> worker completes -> HANDOFF -> user pastes HANDOFF back -> main agent continues`
+Do not automatically create workers, chats, worktrees, reviewers, fixers, validators,
+or replacement agents. A follow-up review or fix also receives a new manual brief.
+Read-only Q&A and coordination-file maintenance do not require worker dispatch.
+Do not silently take over delegated production source/test implementation.
 
-This changes worker transport only. It does not weaken ownership, model/profile,
-validation, review, Git, data-safety, or acceptance rules.
+## Profile and executor selection
 
-## Activation and scope
+Default requested profile for implementation, review, fixing, and validation:
+`gpt6.1sol low`. Preserve this exact user configuration label; do not invent an API
+identifier or claim the model/reasoning was used without observable evidence.
 
-Examples of activation intent:
+The user may choose a new chat, DeepSeekHarness, another harness, or another model.
+If the executor is unspecified or the profile unavailable, mark executor selection
+as user-selected/pending. Do not silently substitute a model or launch an agent.
+A clear task can still receive an executor-neutral package immediately.
+If task requirements themselves are unclear, list the unresolved requirements,
+ask only material questions, and do not authorize dependent execution until resolved.
 
-- “这次我手动开子代理”
-- “不要自动派发”
-- “给我子代理提示词”
-- “我自己发到新对话”
-- “manual subagent / manual dispatch / manual handoff”
+## Deliverable
 
-Two scopes:
+For a delegated execution task provide:
 
-1. One-shot: applies only to the next delegated role.
-2. Task-scoped: applies to the current core task and descendant reviewer/fixer/
-   validator steps until the task finishes or the user resumes automatic mode.
+1. A self-contained Markdown task brief, saved at the project's established task
+   document location when available; otherwise use `docs/tasks/` with a dated,
+   descriptive filename. For tasks without a repository, provide it inline unless
+   the user specifies a permitted output directory. Do not overwrite another brief.
+2. A copyable launch prompt that includes the exact brief path and essential scope,
+   role, profile, no-recursion rule, and terminal HANDOFF requirement.
+3. User-facing file link, suggested execution context, unresolved decisions, and
+   instruction to paste the final HANDOFF back to the main agent.
 
-If ambiguous, use one-shot.
+For an external harness that cannot access local files or skills, include the full
+brief and essential rules inline. A local path alone is insufficient. Do not copy
+private data, secrets, or irrelevant conversation history into portable prompts.
+Do not invent harness commands, flags, available tools, or filesystem access.
 
-## Hard override
+## Task brief contents
 
-While manual mode applies, the main agent must not automatically create:
+Include only relevant fields, but make execution independent of parent context:
 
-- normal subagents;
-- Worktree Chat/tasks;
-- reviewer conversations;
-- fixers;
-- validators;
-- replacement workers.
+- task identifier, role, goal, and explicit exclusions;
+- requested profile `gpt6.1sol low`; executor selected by user;
+- verified current state, repository/worktree, branch, and starting commit;
+- exact readable/writable/forbidden scope and pre-existing dirty-state constraints;
+- concrete requirements, authoritative sources, unresolved decisions and stop gates;
+- acceptance criteria and appropriate focused/affected validation;
+- runtime/environment constraints (prefer `newconda` where applicable);
+- applicable AGENTS/skills and essential invariants reproduced for inaccessible tools;
+- execution permissions: obey applicable sandbox/approval rules; never infer that a
+  task brief or harness selection grants unavailable access;
+- raw/user-data safety, output boundary, Git/commit/push rules;
+- project-memory ownership: workers do not update canonical memory unless assigned;
+- exact review snapshot/commit/diff for independent reviewers;
+- all executors are leaf workers: no nested agents/tasks/reviewers/fixers/validators;
+- terminal HANDOFF schema below.
 
-Do not silently take over delegated source/test implementation in the parent.
+An isolated worktree is recommended only when materially useful. The user launches
+it or delegates its creation explicitly. Review independence needs a separate
+non-implementer context, not necessarily a separate worktree.
 
-Instead, choose the intended role/profile using `subagent-orchestration`, then
-generate a copyable prompt for the user to send to a new chat.
+## Executor continuation
 
-## Preserve normal role/profile selection
+Assign one active owner per implementation lane. The executor should complete
+ordinary debugging within scope; elapsed time, compaction, a failing test, or one
+failed attempt is not alone a reason to abandon the task. Out-of-scope decisions,
+missing permissions, unavailable resources, or scientific-protocol changes return
+to the main agent. Do not recursively delegate them.
 
-Typical mapping:
+## Terminal HANDOFF
 
-- localized implementation -> `Luna xhigh`;
-- focused fixer -> `Luna xhigh`;
-- validator -> `Luna xhigh`;
-- narrow low-risk reviewer -> `Luna xhigh`;
-- substantial/multi-module implementation -> `LunaMax`;
-- Level 3 independent reviewer -> `LunaMax`.
-
-If the task normally needs an isolated worktree, say so in the dispatch header.
-Do not create it automatically while manual mode applies.
-
-## Required dispatch output
-
-Output:
-
-1. role;
-2. recommended profile;
-3. recommended context: ordinary new chat or Worktree Chat if materially needed;
-4. manual scope: one-shot or task-scoped;
-5. one self-contained prompt;
-6. “完成后把最终 HANDOFF 原样粘贴回主代理”.
-
-The prompt must include, when relevant:
-
-- repository/worktree path;
-- branch and starting commit;
-- current Git/dirty-state constraints;
-- task goal and verified current state;
-- exact readable/writable/forbidden scope;
-- project/scientific invariants;
-- applicable `AGENTS.md`, skills, specs, papers, or plans;
-- acceptance criteria;
-- focused/affected validation;
-- Git/commit/push rules;
-- raw/user-data safety;
-- project-memory ownership;
-- no-recursion rule;
-- terminal HANDOFF schema.
-
-Do not paste irrelevant parent-conversation history.
-
-## Worker continuation
-
-The manual worker owns its assigned lane until a legitimate terminal state.
-
-Do not tell it to stop merely because:
-
-- tests fail within scope;
-- debugging is in progress;
-- elapsed time is long;
-- context compacted;
-- the first attempt failed.
-
-It should continue normal debugging/TDD cleanup and end with exactly one status:
-
-- `COMPLETED`
-- `BLOCKED`
-- `FAILED`
-
-A normal manual worker must not create other workers/reviewers/fixers/validators.
-
-## HANDOFF: implementation/fixer/validator
-
-Require:
+Require the final output to end with:
 
 ```text
 HANDOFF
-
+- task identifier:
 - status: COMPLETED / BLOCKED / FAILED
 - role:
-- requested model/profile:
-- observed model/profile/reasoning, when verifiable:
-- repository/worktree:
-- branch:
-- starting commit:
-- ending commit, if any:
-- changed files:
-- implemented behavior:
-- important design decisions:
-- tests/validation:
-- failing tests or blockers:
-- git status:
-- raw/user data status, when relevant:
-- project-memory changes, if any:
-- scope deviations:
-- unresolved issues:
-- next recommended action:
+- executor/harness:
+- requested model/profile: gpt6.1sol low (or explicit user override)
+- observed model/profile/reasoning: evidence or unknown
+- repository/worktree, branch, starting/ending commit:
+- changed files or exact reviewed snapshot/diff:
+- implemented behavior or review result: PASS / BLOCKING
+- tests/validation: commands, visible results, skipped/deferred checks
+- resource preflight/deferred validation when relevant:
+- BLOCKING findings or blockers:
+- NON-BLOCKING findings when relevant:
+- git status and pre-existing user changes preserved:
+- raw/user-data status and generated output locations:
+- project-memory changes, if authorized:
+- deviations, unresolved decisions, next action:
 ```
 
-## HANDOFF: independent reviewer
+No important information should follow HANDOFF. A worker's `COMPLETED` is a claim
+to verify, not automatic acceptance. Independent reviewers remain read-only and
+must inspect the intended final snapshot themselves.
 
-Require:
+## Main-agent resumption
 
-```text
-HANDOFF
+Match the returned HANDOFF to its brief; inspect scope, diff/snapshot, validation,
+Git state, and deviations. Verify material evidence before accepting. Do not ask the
+user to restate context already supplied. Prepare a new manual package for any
+necessary reviewer/fixer/validator, with a separate context for independent review.
+Synchronize canonical project memory only after accepted state is established and
+when authorized by the owning repository workflow.
 
-- status: COMPLETED / BLOCKED / FAILED
-- role: independent reviewer
-- requested model/profile:
-- observed model/profile/reasoning, when verifiable:
-- reviewed repository/worktree or snapshot:
-- reviewed commit/diff/patch identity:
-- result: PASS / BLOCKING
-- BLOCKING findings:
-- NON-BLOCKING findings:
-- validation/evidence inspected:
-- evidence gaps:
-- scope deviations:
-- next recommended action:
-```
-
-No important information should appear after the HANDOFF.
-
-## When HANDOFF is pasted back
-
-The main agent should:
-
-1. match it to the pending manual dispatch;
-2. inspect status, role, changed/reviewed state, tests, Git state, and deviations;
-3. validate repository evidence when normal acceptance rules require it;
-4. continue without asking the user to restate the task;
-5. if another worker/reviewer/fixer is needed and task-scoped manual mode remains
-   active, generate the next manual prompt instead of auto-spawning it.
-
-HANDOFF is evidence, not automatic acceptance.
-
-## Ending manual mode
-
-One-shot ends after its HANDOFF is consumed.
-
-Task-scoped mode ends when:
-
-- the core task is accepted/finished;
-- the user asks to resume automatic dispatch;
-- the user explicitly asks the main agent to take over.
-
-Do not carry manual mode into unrelated future tasks.
+A one-shot automatic-dispatch override ends after its stated scope; the standing
+manual default remains. Only an explicit user instruction changes that default.

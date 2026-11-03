@@ -16,11 +16,18 @@ Review is risk-based, not mandatory for every task.
 Independent review means a separate reviewer context that did not implement the
 change. It does **not** require a separate Git worktree by default.
 
+## Dispatch policy
+
+Default to a manual reviewer task brief and launch prompt using
+`manual-subagent-handoff`. The user selects and launches the reviewer in a
+separate context. Do not auto-create a reviewer unless explicitly authorized.
+All reviewers are leaf workers; no nested delegation.
+
 ## Default reviewer form
 
 For Level 3 review, prefer a separate ordinary reviewer conversation:
 
-- explicitly request `LunaMax` when supported;
+- explicitly request `gpt6.1sol low` when supported;
 - keep the reviewer read-only;
 - provide the exact final commit/diff/snapshot;
 - keep the implementation owner separate from the reviewer;
